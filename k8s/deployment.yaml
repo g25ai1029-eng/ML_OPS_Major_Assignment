@@ -1,0 +1,63 @@
+# k8s/deployment.yaml
+# Deploys 3 replicas of the Olivetti face classifier Flask app.
+# Apply with:  kubectl apply -f k8s/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: olivetti-classifier
+  labels:
+    app: olivetti-classifier
+spec:
+  replicas: 3                        # always keep 3 pods running
+  selector:
+    matchLabels:
+      app: olivetti-classifier
+  template:
+    metadata:
+      labels:
+        app: olivetti-classifier
+    spec:
+      containers:
+        - name: olivetti-classifier
+          image: YOUR_DOCKERHUB_USERNAME/olivetti-face-classifier:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MODEL_PATH
+              value: "savedmodel.pth"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+---
+# NodePort service — exposes the app on a static port on every cluster node
+apiVersion: v1
+kind: Service
+metadata:
+  name: olivetti-classifier-service
+spec:
+  type: NodePort
+  selector:
+    app: olivetti-classifier
+  ports:
+    - protocol: TCP
+      port: 80           # cluster-internal port
+      targetPort: 5000   # Flask container port
+      nodePort: 30080    # external port on the node (30000–32767)
